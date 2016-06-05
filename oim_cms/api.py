@@ -208,7 +208,7 @@ def freshdesk(request):
 def recursive_node_to_dict(node):
     # http://stackoverflow.com/questions/12556268/fastest-way-to-create-json-to-reflect-a-tree-structure-in-python-django-using
     result = {
-        'name': node.name, 'id': node.pk,
+        'name': node.name, 'id': node.pk, "users": node.departmentuser_set.count(), "members": node.members().count(),
         'children': [recursive_node_to_dict(c) for c in node._cached_children]
     }
     if not result["children"]:
