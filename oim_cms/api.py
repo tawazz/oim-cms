@@ -39,16 +39,16 @@ def freshdesk(request):
         'email': request.user.email,
         'priority': int(request.POST.get('priority', 1)),
         'status': int(request.POST.get('status', 2)),
-        'description_html': description,
-        'source': 4
+        'description': description,
+        'source': 7 #source 4 doesnt exist anymore in api/v2 used chat instead
     }
-    r = requests.post(settings.FRESHDESK_ENDPOINT + '/api/v2/tickets',
+    r = requests.post(settings.FRESHDESK_ENDPOINT + '/tickets',
                       auth=settings.FRESHDESK_AUTH, headers={
                           'Content-Type': 'application/json'},
                       data=json.dumps(ticket))
     ticket_id = json.loads(r.content)['id']
     return HttpResponseRedirect(
-        settings.FRESHDESK_ENDPOINT + '/api/v2/tickets/{}'.format(ticket_id))
+        settings.FRESHDESK_ENDPOINT + '/tickets/{}'.format(ticket_id))
 
 
 def recursive_node_to_dict(node):
