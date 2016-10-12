@@ -34,21 +34,21 @@ def freshdesk(request):
         lines.append('<li><b>{}</b>: {}</li>'.format(key, val))
     lines.sort()
     description = '<ul>{}</ul>'.format(''.join(lines))
-    ticket = {'helpdesk_ticket': {
+    ticket = {
         'subject': request.POST.get('subject', 'Form submitted'),
         'email': request.user.email,
         'priority': int(request.POST.get('priority', 1)),
         'status': int(request.POST.get('status', 2)),
         'description_html': description,
         'source': 4
-    }}
-    r = requests.post(settings.FRESHDESK_ENDPOINT + '/helpdesk/tickets.json',
+    }
+    r = requests.post(settings.FRESHDESK_ENDPOINT + '/api/v2/tickets',
                       auth=settings.FRESHDESK_AUTH, headers={
                           'Content-Type': 'application/json'},
                       data=json.dumps(ticket))
-    ticket_id = json.loads(r.content)['helpdesk_ticket']['display_id']
+    ticket_id = json.loads(r.content)['id']
     return HttpResponseRedirect(
-        settings.FRESHDESK_ENDPOINT + '/support/tickets/{}'.format(ticket_id))
+        settings.FRESHDESK_ENDPOINT + '/api/v2/tickets/{}'.format(ticket_id))
 
 
 def recursive_node_to_dict(node):
