@@ -40,7 +40,7 @@ def freshdesk(request):
         'priority': int(request.POST.get('priority', 1)),
         'status': int(request.POST.get('status', 2)),
         'description': description,
-        'source': 7 #source 4 doesnt exist anymore in api/v2 used chat instead
+        'source': 2 #source 4 doesnt exist anymore in api/v2 used portal instead
     }
     r = requests.post(settings.FRESHDESK_ENDPOINT + '/tickets',
                       auth=settings.FRESHDESK_AUTH, headers={
