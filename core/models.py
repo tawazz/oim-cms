@@ -109,10 +109,10 @@ class Content(Page):
         FieldPanel("template_filename")
     ]
 
-    search_fields = Page.search_fields + (
+    search_fields = Page.search_fields + [
         index.SearchField('body'),
         index.FilterField('url_path'),
-    )
+    ]
 
     def serve(self, request):
         if "draft" in request.GET:
