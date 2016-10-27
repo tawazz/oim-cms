@@ -1,14 +1,16 @@
 from __future__ import unicode_literals, absolute_import
+from rest_framework import viewsets
+from rest_framework.decorators import detail_route
+from organisation.models import DepartmentUser
+from .serializers import DepartmentUserSerializer
 from django.conf import settings
 from django.http import (
     HttpResponse, HttpResponseForbidden, HttpResponseBadRequest)
+from rest_framework.response import Response
 from django.utils.text import slugify
 from django.utils.timezone import make_aware
 from django.views.decorators.csrf import csrf_exempt
 import json
-from restless.dj import DjangoResource
-from restless.resources import skip_prepare
-from restless.utils import MoreTypesJSONEncoder
 from oim_cms.utils import FieldsFormatter, CSVDjangoResource
 import logging
 
@@ -41,7 +43,15 @@ def format_account_type(request, value):
         return value
 
 
-class DepartmentUserResource(DjangoResource):
+
+
+class DepartmentUserViewSet(viewsets.ModelViewSet):
+    """docstring for DepartmentUserViewSet."""
+
+    queryset = DepartmentUser.objects.all()
+    serializer_class = DepartmentUserSerializer
+    authentication_classes = []
+
     COMPACT_ARGS = (
         'pk', 'name', 'title', 'employee_id', 'email', 'telephone',
         'mobile_phone', 'extension', 'photo', 'photo_ad', 'org_data', 'parent__email',
@@ -110,7 +120,7 @@ class DepartmentUserResource(DjangoResource):
                     row['email'], row['members'][0].split('@', 1)[1])
         return structure
 
-    def list(self):
+    def list(self, request):
         """Pass query params to modify the API output.
         Include `org_structure=true` and `sync_o365=true` to output only
         OrgUnits with sync_o365 == True.
@@ -160,16 +170,16 @@ class DepartmentUserResource(DjangoResource):
             self.VALUES_ARGS = self.MINIMAL_ARGS
 
         user_values = list(users.values(*self.VALUES_ARGS))
-        return self.formatters.format(self.request, user_values)
+        return Response(self.formatters.format(self.request, user_values))
 
     def is_authenticated(self):
         return True
 
     @csrf_exempt
-    def update(self,pk):
+    def put(self,request,pk=None):
         user = self.userExists()
         if user :
-            if self.data.get('Deleted'):
+            if self.request.data.get('Deleted'):
                 user.active = False
                 user.ad_deleted = True
                 user.ad_updated = True
@@ -178,8 +188,10 @@ class DepartmentUserResource(DjangoResource):
                 data = list(DepartmentUser.objects.filter(pk=user.pk).values(*self.VALUES_ARGS))[0]
                 logger.info("Removed user {} \n{}".format(user.name,self.formatters.format(self.request, data)))
 
-                return self.formatters.format(self.request, data)
-            modified = make_aware(user._meta.get_field('date_updated').clean(self.data['Modified'], user))
+                return Response(self.formatters.format(self.request, data))
+
+            modified = make_aware(user._meta.get_field('date_updated').clean(self.request.data['Modified'], user))
+            print user
             if user.date_ad_updated or modified < user.date_updated:
                 old_user = list(DepartmentUser.objects.filter(pk=user.pk).values(*self.VALUES_ARGS))[0]
                 updated_user = self.updateUser(user)
@@ -188,49 +200,48 @@ class DepartmentUserResource(DjangoResource):
                     'old_user' : old_user['ad_data'],
                     'updated_user': updated_user.ad_data
                 }
-                logger.info("Updated user {}\n{}".format(user.name,self.formatters.format(self.request, log_data)))
+                logger.info("Updated user {}\n{}".format(user.name,self.formatters.format(request, log_data)))
 
-            return self.formatters.format(self.request, data)
+            return Response(self.formatters.format(self.request, data))
         logger.error("User Does Not Exist")
-        return self.formatters.format(self.request, {"Error":"User Does Not Exist"})
+        return Response(self.formatters.format(self.request, {"Error":"User Does Not Exist"}))
 
-    @skip_prepare
-    def create(self):
+    def create(self,request):
         user = self.userExists()
         if not user :
             try:
-                user = DepartmentUser(ad_guid=self.data['ObjectGUID'])
+                user = DepartmentUser(ad_guid=self.request.data['ObjectGUID'])
                 user = self.updateUser(user)
                 data = list(DepartmentUser.objects.filter(pk=user.pk).values(*self.VALUES_ARGS))[0]
                 logger.info("Created User {} \n{} ".format(user.name,self.formatters.format(self.request, data)))
-                return self.formatters.format(self.request, data)
+                return Response(self.formatters.format(self.request, data))
             except Exception as e:
                 data = self.data
                 data['Error'] = repr(e)
                 logger.error(repr(e))
         logger.error("User Already Exist")
-        return self.formatters.format(self.request, {"Error":"User Already Exist"})
+        return Response(self.formatters.format(self.request, {"Error":"User Already Exist"}))
 
 
     def updateUser(self,user):
         try:
-            user.email = self.data['EmailAddress']
-            user.ad_guid = self.data['ObjectGUID']
-            user.ad_dn = self.data['DistinguishedName']
-            user.username = self.data['SamAccountName']
-            user.expiry_date = self.data.get('AccountExpirationDate')
-            user.active = self.data['Enabled']
+            user.email = self.request.data['EmailAddress']
+            user.ad_guid = self.request.data['ObjectGUID']
+            user.ad_dn = self.request.data['DistinguishedName']
+            user.username = self.request.data['SamAccountName']
+            user.expiry_date = self.request.data.get('AccountExpirationDate')
+            user.active = self.request.data['Enabled']
             user.ad_deleted = False
-            user.ad_data = self.data
+            user.ad_data = self.request.data
             if not user.name:
-                user.name = self.data['Name']
-            if self.data['Title']:
-                user.title = self.data['Title']
+                user.name = self.request.data['Name']
+            if self.request.data['Title']:
+                user.title = self.request.data['Title']
             if not user.given_name:
-                user.given_name = self.data['GivenName']
+                user.given_name = self.request.data['GivenName']
             if not user.surname:
-                user.surname = self.data['Surname']
-            user.date_ad_updated = self.data['Modified']
+                user.surname = self.request.data['Surname']
+            user.date_ad_updated = self.request.data['Modified']
             user.ad_updated = True
             user.save()
             return user
@@ -242,80 +253,15 @@ class DepartmentUserResource(DjangoResource):
         ''' check if a user  exists '''
         try:
             user = DepartmentUser.objects.get(
-                email__iexact=self.data['EmailAddress'])
+                email__iexact=self.request.data['EmailAddress'])
         except:
             try:
                 user = DepartmentUser.objects.get(
-                    ad_guid__iendswith=self.data['ObjectGUID'])
+                    ad_guid__iendswith=self.request.data['ObjectGUID'])
             except:
                 try:
                     user = DepartmentUser.objects.get(
-                        ad_dn=self.data['DistinguishedName'])
+                        ad_dn=self.request.data['DistinguishedName'])
                 except:
                     return False
         return user
-
-
-class LocationResource(CSVDjangoResource):
-    VALUES_ARGS = (
-        'pk', 'name', 'address', 'phone', 'fax', 'email', 'point', 'url',
-        'bandwidth_url')
-
-    def list_qs(self):
-        FILTERS = {}
-        if 'location_id' in self.request.GET:
-            FILTERS['pk'] = self.request.GET['location_id']
-        return Location.objects.filter(**FILTERS).values(*self.VALUES_ARGS)
-
-    @skip_prepare
-    def list(self):
-        data = list(self.list_qs())
-        for row in data:
-            if row['point']:
-                row['point'] = row['point'].wkt
-        return data
-
-
-@csrf_exempt
-def profile(request):
-    """An API view that returns the profile for the request user.
-    """
-    if not request.user.is_authenticated():
-        return HttpResponseForbidden()
-
-    # Profile API view should return one object only.
-    self = DepartmentUserResource()
-    if not hasattr(request, 'user') or not request.user.email:
-        return HttpResponseBadRequest('No user email in request')
-    qs = DepartmentUser.objects.filter(email__iexact=request.user.email)
-    if qs.count() > 1 or qs.count() < 1:
-        return HttpResponseBadRequest('API request for {} should return one profile; it returned {}!'.format(
-            request.user.email, qs.count()))
-    user = qs.get(email__iexact=request.user.email)
-
-    if request.method == 'GET':
-        data = qs.values(*self.VALUES_ARGS)[0]
-        # Add the password_age_days property to the API response.
-        data['password_age_days'] = user.password_age_days
-    elif request.method == 'POST':
-        if 'photo' in request.POST and request.POST['photo'] == 'delete':
-            user.photo.delete()
-        elif 'photo' in request.FILES:
-            user.photo.save(
-                request.FILES['photo'].name,
-                request.FILES['photo'],
-                save=False)
-        if 'telephone' in request.POST:
-            user.telephone = request.POST['telephone']
-        if 'mobile_phone' in request.POST:
-            user.mobile_phone = request.POST['mobile_phone']
-        if 'extension' in request.POST:
-            user.extension = request.POST['extension']
-        if 'other_phone' in request.POST:
-            user.other_phone = request.POST['other_phone']
-        if 'preferred_name' in request.POST:
-            user.preferred_name = request.POST['preferred_name']
-        user.save()
-        data = DepartmentUser.objects.filter(pk=user.pk).values(*self.VALUES_ARGS)[0]
-    return HttpResponse(json.dumps(
-        {'objects': [self.formatters.format(request, data)]}, cls=MoreTypesJSONEncoder))

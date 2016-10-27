@@ -35,6 +35,7 @@ INSTALLED_APPS = (
     'mptt',
     'leaflet',
     'django_cron',
+    'rest_framework',
 
     'wagtail.wagtailcore',
     'wagtail.wagtailadmin',
@@ -317,3 +318,9 @@ if DEBUG:
         'debug_toolbar',
     )
     MIDDLEWARE_CLASSES = ('debug_toolbar.middleware.DebugToolbarMiddleware',) + MIDDLEWARE_CLASSES
+
+REST_FRAMEWORK = {
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+    )
+}
