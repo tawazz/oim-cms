@@ -213,7 +213,7 @@ api_urlpatterns = [
     url(r'^locations/', include(LocationResource.urls())),
     url(r'^locations.csv', LocationResource.as_csv),
     url(r'^devices/', include(HardwareResource.urls())),
-    url(r'^', include(router.urls))
+    url(r'^', include(router.urls)),
     url(r'^profile/', profile, name='api_profile'),
     url(r'^options', include(OptionResource.urls())),
     url(r'^whoami', WhoAmIResource.as_detail(), name='api_whoami'),
