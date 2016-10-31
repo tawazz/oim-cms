@@ -175,7 +175,7 @@ class DepartmentUserResourceTestCase(ApiTestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         r = json.loads(response.content)
-        self.assertTrue(isinstance(r['objects'], list))
+        self.assertTrue(isinstance(r, list))
         # Test the compact response.
         url = '/api/users/?compact=true'
         response = self.client.get(url)

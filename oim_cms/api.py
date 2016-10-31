@@ -9,11 +9,13 @@ import requests
 from restless.dj import DjangoResource
 from restless.preparers import FieldsPreparer
 from restless.resources import skip_prepare
+from rest_framework import routers
 
 from approvals.api import ApprovalResource
 from core.models import UserSession
 from mudmap.models import MudMap
 from organisation.api import DepartmentUserResource, LocationResource, profile
+from organisation.api_v2 import DepartmentUserViewSet
 from organisation.models import DepartmentUser, Location, OrgUnit, CostCentre
 from registers.api import ITSystemResource, HardwareResource
 from registers.models import ITSystem
@@ -194,7 +196,12 @@ class MudMapResource(CSVDjangoResource):
             mudmap.save()
             return {'saved': self.data['name']}
 
+router = routers.DefaultRouter()
+router.register(r'^users',DepartmentUserViewSet)
 
+api_patterns = [
+    url(r'^', include(router.urls))
+]
 api_urlpatterns = [
     url(r'^approvals/', include(ApprovalResource.urls())),
     url(r'^freshdesk', freshdesk, name='api_freshdesk'),
@@ -206,7 +213,7 @@ api_urlpatterns = [
     url(r'^locations/', include(LocationResource.urls())),
     url(r'^locations.csv', LocationResource.as_csv),
     url(r'^devices/', include(HardwareResource.urls())),
-    url(r'^users/', include(DepartmentUserResource.urls())),
+    url(r'^', include(router.urls))
     url(r'^profile/', profile, name='api_profile'),
     url(r'^options', include(OptionResource.urls())),
     url(r'^whoami', WhoAmIResource.as_detail(), name='api_whoami'),
