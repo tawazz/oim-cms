@@ -6,6 +6,7 @@ from .serializers import DepartmentUserSerializer
 from django.conf import settings
 from django.http import (
     HttpResponse, HttpResponseForbidden, HttpResponseBadRequest)
+from restless.resources import skip_prepare
 from rest_framework.response import Response
 from django.utils.text import slugify
 from django.utils.timezone import make_aware
@@ -137,7 +138,7 @@ class DepartmentUserViewSet(viewsets.ModelViewSet):
         else:
             exclude_populate_groups = False  # Will ignore populate_primary_group
         if 'org_structure' in self.request.GET:
-            return self.org_structure(sync_o365=sync_o365, exclude_populate_groups=exclude_populate_groups)
+            return Response(self.org_structure(sync_o365=sync_o365, exclude_populate_groups=exclude_populate_groups))
 
         if 'all' in self.request.GET:
             # Return all DU objects, including those deleted in AD.
@@ -265,3 +266,67 @@ class DepartmentUserViewSet(viewsets.ModelViewSet):
                 except:
                     return False
         return user
+
+class LocationResource(CSVDjangoResource):
+    VALUES_ARGS = (
+        'pk', 'name', 'address', 'phone', 'fax', 'email', 'point', 'url',
+        'bandwidth_url')
+
+    def list_qs(self):
+        FILTERS = {}
+        if 'location_id' in self.request.GET:
+            FILTERS['pk'] = self.request.GET['location_id']
+        return Location.objects.filter(**FILTERS).values(*self.VALUES_ARGS)
+
+    @skip_prepare
+    def list(self):
+        data = list(self.list_qs())
+        for row in data:
+            if row['point']:
+                row['point'] = row['point'].wkt
+        return data
+
+
+@csrf_exempt
+def profile(request):
+    """An API view that returns the profile for the request user.
+    """
+    if not request.user.is_authenticated():
+        return HttpResponseForbidden()
+
+    # Profile API view should return one object only.
+    self = DepartmentUserResource()
+    if not hasattr(request, 'user') or not request.user.email:
+        return HttpResponseBadRequest('No user email in request')
+    qs = DepartmentUser.objects.filter(email__iexact=request.user.email)
+    if qs.count() > 1 or qs.count() < 1:
+        return HttpResponseBadRequest('API request for {} should return one profile; it returned {}!'.format(
+            request.user.email, qs.count()))
+    user = qs.get(email__iexact=request.user.email)
+
+    if request.method == 'GET':
+        data = qs.values(*self.VALUES_ARGS)[0]
+        # Add the password_age_days property to the API response.
+        data['password_age_days'] = user.password_age_days
+    elif request.method == 'POST':
+        if 'photo' in request.POST and request.POST['photo'] == 'delete':
+            user.photo.delete()
+        elif 'photo' in request.FILES:
+            user.photo.save(
+                request.FILES['photo'].name,
+                request.FILES['photo'],
+                save=False)
+        if 'telephone' in request.POST:
+            user.telephone = request.POST['telephone']
+        if 'mobile_phone' in request.POST:
+            user.mobile_phone = request.POST['mobile_phone']
+        if 'extension' in request.POST:
+            user.extension = request.POST['extension']
+        if 'other_phone' in request.POST:
+            user.other_phone = request.POST['other_phone']
+        if 'preferred_name' in request.POST:
+            user.preferred_name = request.POST['preferred_name']
+        user.save()
+        data = DepartmentUser.objects.filter(pk=user.pk).values(*self.VALUES_ARGS)[0]
+    return HttpResponse(json.dumps(
+        {'objects': [self.formatters.format(request, data)]}, cls=MoreTypesJSONEncoder))

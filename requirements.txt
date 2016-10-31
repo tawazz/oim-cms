@@ -18,6 +18,7 @@ python-social-auth==0.2.21
 graphviz==0.4.8
 json2html==1.0.1
 djangorestframework==3.3.1
+djangorestframework==3.5
 Babel==2.2.0
 pycsw==1.10.3
 SQLAlchemy==1.0.12
